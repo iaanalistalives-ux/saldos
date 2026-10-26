@@ -75,6 +75,8 @@ th.r,td.r{text-align:right;}
 .vacio{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:28px;text-align:center;color:var(--stone);}
 .vacio2{color:var(--stone);font-size:13px;padding:10px 0;}
 .verdet{display:none;}
+.kpi[data-go]{cursor:pointer;transition:box-shadow .15s,transform .15s;}.kpi[data-go]:hover{box-shadow:var(--sh-h);transform:translateY(-1px);}.kpi[data-go]:focus-visible{outline:2px solid var(--sage);outline-offset:2px;}
+.panel{scroll-margin-top:84px;}.panel.dest{animation:dest 1.6s ease-out;}@keyframes dest{0%,35%{box-shadow:0 0 0 3px var(--sage),var(--sh-h);}100%{box-shadow:var(--sh);}}
 @media(max-width:900px){.wrap{padding:14px 14px 36px;}.col12,.col8,.col6,.col4{grid-column:span 12;}}
 @media(max-width:600px){
  body{font-size:13.5px;}
@@ -408,7 +410,7 @@ function barsCfg(labels,sets,horiz){return {type:'bar',data:{labels,datasets:set
  options:{indexAxis:horiz?'y':'x',layout:{padding:horiz?{right:46}:{top:22}},plugins:{legend:sets.length>1?LEY:{display:false}},scales:horiz?{x:{beginAtZero:true,grace:'8%',ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}:{y:{beginAtZero:true,ticks:{callback:v=>fmt(v)}},x:{grid:{display:false}}}},plugins:[valBarras]};}
 
 /* ---------- helpers de panel ---------- */
-const panel=(cls,tira,t,h,body)=>`<div class="panel ${cls}"><span class="tira ${tira}"></span><div class="pt">${t}</div><div class="ph">${h}</div>${body}</div>`;
+const panel=(cls,tira,t,h,body,id)=>`<div class="panel ${cls}"${id?` id="${id}"`:''}><span class="tira ${tira}"></span><div class="pt">${t}</div><div class="ph">${h}</div>${body}</div>`;
 const cv=(id,tall)=>`<div class="cwrap${tall?' tall':''}"><canvas id="${id}"></canvas></div>`;
 function table(heads,rows,right){return `<div class="tw"><table><thead><tr>${heads.map((h,i)=>`<th class="${right.includes(i)?'r':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${right.includes(i)?'r':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
 function rank(items,total){if(!items.length)return '<div class="vacio2">Sin registros para este ranking con el filtro actual.</div>';const mx=items[0].q;
@@ -420,7 +422,7 @@ function opStats(A){const m=new Map();A.forEach(r=>{let o=m.get(r.op);if(!o){o={
  return [...m.values()].map(o=>{o.v=o.fs.size;o.d=Math.round((new Date(o.u)-new Date(o.p))/864e5);return o;}).sort((a,b)=>b.q-a.q);}
 function top50(items,tot){let c=0;const out=[];for(const o of items){out.push(o);c+=o.q;if(c>=tot*.5)break;}return out;}
 const mediana=a=>{if(!a.length)return null;const s=a.slice().sort((x,y)=>x-y),h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2;};
-const kpi=(cls,l,v,s,vs)=>`<div class="kpi ${cls}"><span class="banda"></span><div class="cuerpo"><div class="l">${l}</div><div class="row"><span class="v"${vs?` style="${vs}"`:''}>${v}</span></div><div class="s">${s}</div></div></div>`;
+const kpi=(cls,l,v,s,go)=>`<div class="kpi ${cls}" data-go="${go}" role="button" tabindex="0" title="Ver dónde está este dato"><span class="banda"></span><div class="cuerpo"><div class="l">${l}</div><div class="row"><span class="v">${v}</span></div><div class="s">${s}</div></div></div>`;
 
 function render(){
  CH.forEach(c=>c.destroy());CH=[];
@@ -429,17 +431,19 @@ function render(){
  const tot=sum(A),ys=years(),ops=opStats(A),t50=top50(ops,tot);
  const rec=ops.filter(o=>o.v>1),qrec=rec.reduce((s,o)=>s+o.q,0),qgen=sum(A.filter(r=>r.mo==='Saldos'));
  app.innerHTML=`<div class="kpis">
-  ${kpi('hero','Prendas en saldo',fmt(tot),`${fmt(ops.length)} OPs · ${A.length.toLocaleString('es-PE')} registros · ${S.y==='all'?'2025 y 2026':'año '+S.y}`)}
-  ${kpi('neutro','OPs que suman el 50% del saldo',fmt(t50.length),`de ${fmt(ops.length)} OPs con saldo · ${fmt(t50.reduce((s,o)=>s+o.q,0))} prendas (${pct(t50.reduce((s,o)=>s+o.q,0),tot)})`)}
-  ${kpi('neutro','Saldo que reaparece',pct(qrec,tot),`${fmt(qrec)} prendas en ${fmt(rec.length)} OPs con saldo en más de una fecha`)}
-  ${kpi('neutro','Prendas sin causa registrada',pct(qgen,tot),`motivo "Saldos" a secas · solo ${fmt(tot-qgen)} prendas traen causa (no aceptado por cliente o fuera de fecha)`)}
+  ${kpi('hero','Prendas en saldo',fmt(tot),`${fmt(ops.length)} OPs · ${A.length.toLocaleString('es-PE')} registros · ${S.y==='all'?'2025 y 2026':'año '+S.y}`,'3:pn-det')}
+  ${kpi('neutro','OPs que suman el 50% del saldo',fmt(t50.length),`de ${fmt(ops.length)} OPs con saldo · ${fmt(t50.reduce((s,o)=>s+o.q,0))} prendas (${pct(t50.reduce((s,o)=>s+o.q,0),tot)})`,'0:pn-ops')}
+  ${kpi('neutro','Saldo que reaparece',pct(qrec,tot),`${fmt(qrec)} prendas en ${fmt(rec.length)} OPs con saldo en más de una fecha`,'0:pn-reap')}
+  ${kpi('neutro','Prendas sin causa registrada',pct(qgen,tot),`motivo "Saldos" a secas · solo ${fmt(tot-qgen)} prendas traen causa (no aceptado por cliente o fuera de fecha)`,'0:pn-nz')}
  </div>
  <div class="tabs" id="tabs">${TABS.map((t,i)=>`<button type="button" data-i="${i}">${t}</button>`).join('')}</div>
  <div class="tabpane" id="p0"></div><div class="tabpane" id="p1"></div><div class="tabpane" id="p2"></div><div class="tabpane" id="p3"></div>`;
  document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>setTab(+b.dataset.i));
+ document.querySelectorAll('.kpi[data-go]').forEach(k=>{const ir=()=>irA(k.dataset.go);k.onclick=ir;k.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();ir();}};});
  pAtk(A,tot,ops,t50,rec);pTend(A,B,ys,tot);pCli(A,B,ys,tot,ops);pDet();
  setTab(S.tab);plegar();
 }
+function irA(go){const [i,id]=go.split(':');setTab(+i);let el=document.getElementById(id)||(id==='pn-nz'&&document.getElementById('pn-reap'));if(!el)return;document.querySelectorAll('.dest').forEach(x=>x.classList.remove('dest'));el.scrollIntoView({behavior:'smooth',block:'start'});void el.offsetWidth;el.classList.add('dest');}
 function setTab(i){S.tab=i;document.querySelectorAll('#tabs button').forEach((b,k)=>b.classList.toggle('active',k===i));document.querySelectorAll('.tabpane').forEach((p,k)=>p.classList.toggle('active',k===i));CH.forEach(c=>{try{c.resize();}catch(e){}});}
 
 function pAtk(A,tot,ops,t50,rec){
@@ -450,9 +454,9 @@ function pAtk(A,tot,ops,t50,rec){
  const bk=[['1 fecha (saldo puntual)',b1],['2 fechas',b2],['3 fechas o más',b3]].filter(x=>x[1].length).map(([t,a])=>[t,fmt(a.length),fmt(qs(a)),pct(qs(a),tot),t.startsWith('1')?'—':md(a)]);
  if(l30.length)bk.push(['De las que reaparecen: más de 30 días entre la 1ª y la última',fmt(l30.length),fmt(qs(l30)),pct(qs(l30),tot),md(l30)]);
  const nz=ops.filter(o=>o.nz>0).sort((a,b)=>b.nz-a.nz).slice(0,8).map(o=>{const r=A.find(x=>x.op===o.op&&x.mo!=='Saldos');return {nm:'OP '+o.op,sb:o.c+' · '+r.mo,q:o.nz,n:o.n};});
- document.getElementById('p0').innerHTML=`<div class="grid">${panel('col12','riesgo','OPs que concentran el saldo',`${t50.length} de ${ops.length} OPs suman el 50% de las prendas en saldo del filtro${t50.length>40?' (se muestran las 40 mayores)':''}. % acum. = suma de las prendas de esa fila y las de arriba ÷ ${fmt(tot)}. Fechas = en cuántas fechas distintas aparece saldo de esa OP.`,table(['#','OP','Cliente','Estilo','Prendas','% del saldo','% acum.','Aparece en','Entre la 1ª y la última'],rows,[4,5,6]).replace('class="tw"','class="tw alto"'))}
- ${panel('col8','riesgo','Saldo puntual contra saldo que reaparece','Una OP que vuelve a dejar saldo en otra fecha es saldo que no se cerró. % = prendas del grupo ÷ prendas en saldo del filtro.',table(['Grupo de OPs','OPs','Prendas','% de las prendas','Mediana entre 1ª y última'],bk,[1,2,3,4]))}
- ${nz.length?panel('col4','riesgo','OPs con saldo no aceptado o fuera de fecha','Las únicas prendas con causa registrada: "No aceptados por cliente" o "Fuera de fecha de embarque". 8 OPs con más prendas.',rank(nz,tot)):''}</div>`;
+ document.getElementById('p0').innerHTML=`<div class="grid">${panel('col12','riesgo','OPs que concentran el saldo',`${t50.length} de ${ops.length} OPs suman el 50% de las prendas en saldo del filtro${t50.length>40?' (se muestran las 40 mayores)':''}. % acum. = suma de las prendas de esa fila y las de arriba ÷ ${fmt(tot)}. Fechas = en cuántas fechas distintas aparece saldo de esa OP.`,table(['#','OP','Cliente','Estilo','Prendas','% del saldo','% acum.','Aparece en','Entre la 1ª y la última'],rows,[4,5,6]).replace('class="tw"','class="tw alto"'),'pn-ops')}
+ ${panel('col8','riesgo','Saldo puntual contra saldo que reaparece','Una OP que vuelve a dejar saldo en otra fecha es saldo que no se cerró. % = prendas del grupo ÷ prendas en saldo del filtro.',table(['Grupo de OPs','OPs','Prendas','% de las prendas','Mediana entre 1ª y última'],bk,[1,2,3,4]),'pn-reap')}
+ ${nz.length?panel('col4','riesgo','OPs con saldo no aceptado o fuera de fecha','Las únicas prendas con causa registrada: "No aceptados por cliente" o "Fuera de fecha de embarque". 8 OPs con más prendas.',rank(nz,tot),'pn-nz'):''}</div>`;
 }
 function timeline(ys){const tl=[];for(let y=2025;y<=2026;y++)for(let m=1;m<=12;m++){if((y===2025&&m<6)||(y===2026&&m>10))continue;if(ys.includes(y))tl.push([y,m]);}return tl;}
 function pTend(A,B,ys,tot){
@@ -481,7 +485,7 @@ function detRows(){const q=S.q.trim().toLowerCase();let a=sel();if(q)a=a.filter(
 function pDet(){
  const a=detRows(),filtrado=S.y!=='all'||S.c||S.m||S.q.trim(),v=filtrado?a:a.slice(0,500);
  const rows=v.map(r=>[r.f.slice(8)+'/'+r.f.slice(5,7)+'/'+r.f.slice(0,4),esc(r.c),esc(r.po),esc(r.op),esc(r.e),esc(r.co),esc(r.t),esc(r.mo),fmt(r.q)]);
- document.getElementById('p3').innerHTML=`<div class="grid">${panel('col12','','Detalle de saldos','Un registro = una OP, talla y color con saldo. Lo más reciente arriba.',table(['Fecha','Cliente','PO','OP','Estilo','Color','Talla','Motivo','Prendas'],rows,[8])+(!filtrado&&a.length>500?`<div class="lsTope500">Se muestran los 500 registros más recientes de ${a.length.toLocaleString('es-PE')}. Usa los filtros para ver los demás.</div>`:''))}</div>`;
+ document.getElementById('p3').innerHTML=`<div class="grid">${panel('col12','','Detalle de saldos','Un registro = una OP, talla y color con saldo. Lo más reciente arriba.',table(['Fecha','Cliente','PO','OP','Estilo','Color','Talla','Motivo','Prendas'],rows,[8])+(!filtrado&&a.length>500?`<div class="lsTope500">Se muestran los 500 registros más recientes de ${a.length.toLocaleString('es-PE')}. Usa los filtros para ver los demás.</div>`:''),'pn-det')}</div>`;
 }
 function plegar(){const mv=matchMedia('(max-width:600px)').matches;document.querySelectorAll('.panel').forEach(p=>{if(!p.querySelector('table'))return;if(!mv){p.classList.remove('plegable','plegado');return;}if(p.classList.contains('plegable'))return;p.classList.add('plegable','plegado');const b=document.createElement('button');b.type='button';b.className='verdet';b.textContent='Ver tabla';b.onclick=()=>{const s=p.classList.toggle('plegado');b.textContent=s?'Ver tabla':'Ocultar tabla';};p.appendChild(b);});}
 
