@@ -61,6 +61,8 @@ td{padding:8px 6px;border-bottom:1px solid var(--warm-light);}
 tr:hover td{background:var(--warm-light);}
 th.r,td.r{text-align:right;}
 .tw{overflow-x:auto;}
+.tw.alto{max-height:480px;overflow-y:auto;}
+.tw.alto th{position:sticky;top:0;background:var(--card);z-index:1;}
 .rank{list-style:none;margin:0;padding:0;}
 .rank li{display:grid;grid-template-columns:24px 1fr 70px;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--warm-light);}
 .rank .n{width:24px;height:24px;border-radius:50%;background:var(--warm-light);color:var(--stone);font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;}
@@ -413,88 +415,73 @@ function rank(items,total){if(!items.length)return '<div class="vacio2">Sin regi
  return '<ul class="rank">'+items.map((o,i)=>`<li><span class="n">${i+1}</span><div><div class="nm">${esc(o.nm)}</div><div class="sb">${esc(o.sb)} · ${fmt(o.q)} prendas · ${o.n} registros · ${pct(o.q,total)} de ${fmt(total)}</div><div class="track"><div class="fill" style="width:${o.q/mx*100}%"></div></div></div><span class="val">${fmt(o.q)}</span></li>`).join('')+'</ul>';}
 
 /* ---------- render ---------- */
+const TABS=['Dónde atacar','Tendencia','Clientes y estilos','Detalle'];
+function opStats(A){const m=new Map();A.forEach(r=>{let o=m.get(r.op);if(!o){o={op:r.op,c:r.c,e:r.e,q:0,n:0,fs:new Set(),p:r.f,u:r.f,nz:0};m.set(r.op,o);}o.q+=r.q;o.n++;o.fs.add(r.f);if(r.f<o.p)o.p=r.f;if(r.f>o.u)o.u=r.f;if(r.mo!=='Saldos')o.nz+=r.q;});
+ return [...m.values()].map(o=>{o.v=o.fs.size;o.d=Math.round((new Date(o.u)-new Date(o.p))/864e5);return o;}).sort((a,b)=>b.q-a.q);}
+function top50(items,tot){let c=0;const out=[];for(const o of items){out.push(o);c+=o.q;if(c>=tot*.5)break;}return out;}
+const mediana=a=>{if(!a.length)return null;const s=a.slice().sort((x,y)=>x-y),h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2;};
+const kpi=(cls,l,v,s,vs)=>`<div class="kpi ${cls}"><span class="banda"></span><div class="cuerpo"><div class="l">${l}</div><div class="row"><span class="v"${vs?` style="${vs}"`:''}>${v}</span></div><div class="s">${s}</div></div></div>`;
+
 function render(){
  CH.forEach(c=>c.destroy());CH=[];
  const A=sel(),B=base(),app=document.getElementById('app');
  if(!A.length){app.innerHTML='<div class="vacio">No hay saldos registrados con este filtro. Cambia el año, el cliente o el motivo en la barra de arriba.</div>';return;}
- const tot=sum(A),ys=years();
- const w=(y)=>sum(B.filter(r=>r.y===y&&r.m>=6&&r.m<=9)),a25=w(2025),a26=w(2026);
- let kc='';
- if(a25>0&&a26>0){const dp=(a26-a25)/a25*100;kc=`<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">Jun–Sep 2026 vs 2025</div><div class="row"><span class="v">${fmt(a26)}</span><span class="d ${dp>0.5?'up':dp<-0.5?'down':'flat'}">${dp>0?'▲':dp<0?'▼':'■'} ${Math.abs(dp).toLocaleString('es-PE',{maximumFractionDigits:1})}%</span></div><div class="s">prendas en saldo · vs ${fmt(a25)} en jun–sep 2025 (los 4 meses completos en ambos años)</div></div></div>`;}
- else kc=`<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">Jun–Sep 2026 vs 2025</div><div class="row"><span class="v">—</span></div><div class="s">sin datos en ambos años para este filtro</div></div></div>`;
- const ops=new Set(A.map(r=>r.op)).size;
- const top=S.c?group(A,'e')[0]:group(A,'c')[0];
+ const tot=sum(A),ys=years(),ops=opStats(A),t50=top50(ops,tot);
+ const rec=ops.filter(o=>o.v>1),qrec=rec.reduce((s,o)=>s+o.q,0),qgen=sum(A.filter(r=>r.mo==='Saldos'));
  app.innerHTML=`<div class="kpis">
-  <div class="kpi hero"><span class="banda"></span><div class="cuerpo"><div class="l">Prendas en saldo</div><div class="row"><span class="v">${fmt(tot)}</span></div><div class="s">${A.length.toLocaleString('es-PE')} registros · ${S.y==='all'||S.y==='cmp'?'2025 y 2026':'año '+S.y}</div></div></div>
-  ${kc}
-  <div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">OPs con saldo</div><div class="row"><span class="v">${fmt(ops)}</span></div><div class="s">órdenes de producción distintas</div></div></div>
-  <div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">Prendas por OP</div><div class="row"><span class="v">${fmt(tot/ops)}</span></div><div class="s">${fmt(tot)} prendas ÷ ${fmt(ops)} OPs</div></div></div>
-  <div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">${S.c?'Estilo con más saldo':'Cliente con más saldo'}</div><div class="row"><span class="v" style="font-size:${String(top.k).length>12?22:30}px;letter-spacing:0">${esc(top.k)}</span></div><div class="s">${fmt(top.q)} prendas · ${pct(top.q,tot)} de las ${fmt(tot)} del filtro</div></div></div>
+  ${kpi('hero','Prendas en saldo',fmt(tot),`${fmt(ops.length)} OPs · ${A.length.toLocaleString('es-PE')} registros · ${S.y==='all'?'2025 y 2026':'año '+S.y}`)}
+  ${kpi('neutro','OPs que suman el 50% del saldo',fmt(t50.length),`de ${fmt(ops.length)} OPs con saldo · ${fmt(t50.reduce((s,o)=>s+o.q,0))} prendas (${pct(t50.reduce((s,o)=>s+o.q,0),tot)})`)}
+  ${kpi('neutro','Saldo que reaparece',pct(qrec,tot),`${fmt(qrec)} prendas en ${fmt(rec.length)} OPs con saldo en más de una fecha`)}
+  ${kpi('neutro','Prendas sin causa registrada',pct(qgen,tot),`motivo "Saldos" a secas · solo ${fmt(tot-qgen)} prendas traen causa (no aceptado por cliente o fuera de fecha)`)}
  </div>
- <div class="tabs" id="tabs">${['Tendencia','Motivos','Clientes','Producto','Dónde atacar primero','Detalle'].map((t,i)=>`<button type="button" data-i="${i}">${t}</button>`).join('')}</div>
- <div class="tabpane" id="p0"></div><div class="tabpane" id="p1"></div><div class="tabpane" id="p2"></div><div class="tabpane" id="p3"></div><div class="tabpane" id="p4"></div><div class="tabpane" id="p5"></div>`;
+ <div class="tabs" id="tabs">${TABS.map((t,i)=>`<button type="button" data-i="${i}">${t}</button>`).join('')}</div>
+ <div class="tabpane" id="p0"></div><div class="tabpane" id="p1"></div><div class="tabpane" id="p2"></div><div class="tabpane" id="p3"></div>`;
  document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>setTab(+b.dataset.i));
- pTend(A,B,ys);pMot(A,B,ys);pCli(A,B,ys);pProd(A,B,ys);pAtk(A,tot);pDet();
+ pAtk(A,tot,ops,t50,rec);pTend(A,B,ys,tot);pCli(A,B,ys,tot,ops);pDet();
  setTab(S.tab);plegar();
 }
 function setTab(i){S.tab=i;document.querySelectorAll('#tabs button').forEach((b,k)=>b.classList.toggle('active',k===i));document.querySelectorAll('.tabpane').forEach((p,k)=>p.classList.toggle('active',k===i));CH.forEach(c=>{try{c.resize();}catch(e){}});}
-function timeline(ys){const tl=[];for(let y=2025;y<=2026;y++)for(let m=1;m<=12;m++){if((y===2025&&m<6)||(y===2026&&m>10))continue;if(ys.includes(y))tl.push([y,m]);}return tl;}
-const tlab=t=>MES[t[1]-1]+' '+String(t[0]).slice(2);
 
-function pTend(A,B,ys){
+function pAtk(A,tot,ops,t50,rec){
+ const lim=t50.slice(0,40),acc=[];let c=0;lim.forEach(o=>{c+=o.q;acc.push(c);});
+ const rows=lim.map((o,i)=>[i+1,'OP '+esc(o.op),esc(o.c),esc(o.e),fmt(o.q),pct(o.q,tot),pct(acc[i],tot),o.v>1?o.v+' fechas':'1 fecha',o.v>1?fmt(o.d)+' días':'—']);
+ const b1=ops.filter(o=>o.v===1),b2=ops.filter(o=>o.v===2),b3=ops.filter(o=>o.v>=3),l30=rec.filter(o=>o.d>30);
+ const qs=a=>a.reduce((s,o)=>s+o.q,0),md=a=>{const m=mediana(a.map(o=>o.d));return m==null?'—':fmt(m)+' días';};
+ const bk=[['1 fecha (saldo puntual)',b1],['2 fechas',b2],['3 fechas o más',b3]].filter(x=>x[1].length).map(([t,a])=>[t,fmt(a.length),fmt(qs(a)),pct(qs(a),tot),t.startsWith('1')?'—':md(a)]);
+ if(l30.length)bk.push(['De las que reaparecen: más de 30 días entre la 1ª y la última',fmt(l30.length),fmt(qs(l30)),pct(qs(l30),tot),md(l30)]);
+ const nz=ops.filter(o=>o.nz>0).sort((a,b)=>b.nz-a.nz).slice(0,8).map(o=>{const r=A.find(x=>x.op===o.op&&x.mo!=='Saldos');return {nm:'OP '+o.op,sb:o.c+' · '+r.mo,q:o.nz,n:o.n};});
+ document.getElementById('p0').innerHTML=`<div class="grid">${panel('col12','riesgo','OPs que concentran el saldo',`${t50.length} de ${ops.length} OPs suman el 50% de las prendas en saldo del filtro${t50.length>40?' (se muestran las 40 mayores)':''}. % acum. = suma de las prendas de esa fila y las de arriba ÷ ${fmt(tot)}. Fechas = en cuántas fechas distintas aparece saldo de esa OP.`,table(['#','OP','Cliente','Estilo','Prendas','% del saldo','% acum.','Aparece en','Entre la 1ª y la última'],rows,[4,5,6]).replace('class="tw"','class="tw alto"'))}
+ ${panel('col8','riesgo','Saldo puntual contra saldo que reaparece','Una OP que vuelve a dejar saldo en otra fecha es saldo que no se cerró. % = prendas del grupo ÷ prendas en saldo del filtro.',table(['Grupo de OPs','OPs','Prendas','% de las prendas','Mediana entre 1ª y última'],bk,[1,2,3,4]))}
+ ${nz.length?panel('col4','riesgo','OPs con saldo no aceptado o fuera de fecha','Las únicas prendas con causa registrada: "No aceptados por cliente" o "Fuera de fecha de embarque". 8 OPs con más prendas.',rank(nz,tot)):''}</div>`;
+}
+function timeline(ys){const tl=[];for(let y=2025;y<=2026;y++)for(let m=1;m<=12;m++){if((y===2025&&m<6)||(y===2026&&m>10))continue;if(ys.includes(y))tl.push([y,m]);}return tl;}
+function pTend(A,B,ys,tot){
  const ds=ys.map(y=>({label:yl(y),data:MES.map((_,i)=>{const r=B.filter(x=>x.y===y&&x.m===i+1);return r.length?sum(r):null;}),borderColor:YC[y],backgroundColor:YC[y],borderWidth:y===2026?3.5:2.5,tension:.15,pointRadius:4,pointHoverRadius:6,pointBackgroundColor:YC[y],pointBorderColor:'#fff',pointBorderWidth:2,spanGaps:false}));
- const seg=timeline(ys),cl=group(B,'c').slice(0,5).map(o=>o.k);
- const sets=cl.map((c,i)=>({label:c,backgroundColor:ROT[i],data:seg.map(t=>sum(B.filter(r=>r.c===c&&r.y===t[0]&&r.m===t[1])))}));
- sets.push({label:'Otros',backgroundColor:'#9CA3AF',data:seg.map(t=>sum(B.filter(r=>!cl.includes(r.c)&&r.y===t[0]&&r.m===t[1])))});
- document.getElementById('p0').innerHTML=`<div class="grid">${panel('col8','volumen','Prendas en saldo por mes, año contra año','Suma de prendas por mes de realización. Una línea por año. 2026* = año en curso, incompleto (el archivo llega al 17/10). Mes sin línea = sin datos en el archivo (2025 trae jun–oct).',cv('cLin',true))}
- ${panel('col4','volumen','Saldo por cliente','Prendas en saldo con el filtro actual, 8 mayores. Etiqueta = prendas.',cv('cCli',true))}
- ${panel('col12','volumen','Evolución mensual por cliente','Prendas en saldo por mes, apiladas por cliente (5 mayores del filtro; el resto en "Otros"). Nov–dic 2025 no vienen en el archivo.',cv('cApi',true))}</div>`;
+ let t25=0,t26=0;const hom=[5,6,7,8,9].map(i=>{const a=sum(B.filter(r=>r.y===2025&&r.m===i+1)),b=sum(B.filter(r=>r.y===2026&&r.m===i+1));t25+=a;t26+=b;return [MES[i],fmt(a),fmt(b),a?((b-a)/a*100).toLocaleString('es-PE',{maximumFractionDigits:1})+'%':'—'];});
+ hom.push(['<b>Jun–oct</b>','<b>'+fmt(t25)+'</b>','<b>'+fmt(t26)+'</b>','<b>'+(t25?((t26-t25)/t25*100).toLocaleString('es-PE',{maximumFractionDigits:1})+'%':'—')+'</b>']);
+ const fe=group(A,'f'),nf=fe.length;
+ const cargas=fe.slice(0,8).map(o=>{const cs=group(A.filter(r=>r.f===o.k),'c');o.nm=o.k.slice(8)+'/'+o.k.slice(5,7)+'/'+o.k.slice(0,4);o.sb=cs.slice(0,2).map(x=>x.k).join(', ')+' · '+o.ops.size+' OPs';return o;});
+ document.getElementById('p1').innerHTML=`<div class="grid">${panel('col8','volumen','Prendas en saldo por mes, año contra año','Suma de prendas por mes de realización. 2025 trae solo jun–oct y 2026 llega al 17/10 (*): no se comparan años completos. Sin producción por OP es un conteo de prendas, no una tasa.',cv('cLin',true))}
+ ${panel('col4','volumen','Mismos meses en ambos años','Jun–oct, los meses que existen en los dos años. Var. = (2026 − 2025) ÷ 2025. Oct 2026 llega al 17/10. No se ve afectado por el selector de año.',table(['Mes','2025','2026','Var.'],hom,[1,2,3]))}
+ ${panel('col12','volumen','Fechas con más saldo registrado',`El saldo se registra en pocas fechas (${nf} con el filtro actual): un solo día puede explicar un mes entero. 8 fechas con más prendas. % = sobre ${fmt(tot)}.`,rank(cargas,tot))}</div>`;
  mk('cLin',{type:'line',data:{labels:MES,datasets:ds},options:{layout:{padding:{top:34}},interaction:{mode:'nearest',intersect:false},plugins:{legend:LEY,tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)+' prendas'}}},scales:{y:{beginAtZero:true,grace:'8%',ticks:{callback:v=>fmt(v)}},x:{grid:{display:false}}}},plugins:[etqAnual]});
- const g=group(A,'c').slice(0,8);
- mk('cCli',barsCfg(g.map(o=>o.k),[{label:'Prendas',data:g.map(o=>o.q),backgroundColor:'#4E6B78'}],true));
- mk('cApi',{type:'bar',data:{labels:seg.map(tlab),datasets:sets},options:{plugins:{legend:LEY,tooltip:{mode:'index',callbacks:{footer:it=>'Total: '+fmt(it.reduce((s,i)=>s+i.parsed.y,0))}}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>fmt(v)}}}}});
 }
-function pMot(A,B,ys){
- const mots=[...new Set(D.map(r=>r.mo))].sort((a,b)=>sum(D.filter(r=>r.mo===b))-sum(D.filter(r=>r.mo===a)));
- const rows=group(A,'c').map(o=>{const x=A.filter(r=>r.c===o.k),t=sum(x),v=mots.map(m=>sum(x.filter(r=>r.mo===m)));return [esc(o.k),...v.map(fmt),fmt(t),pct(t-v[0],t)];});
- document.getElementById('p1').innerHTML=`<div class="grid">${panel('col6','riesgo','Prendas por motivo y año','Prendas en saldo por motivo. Casi todo es "Saldos" a secas; los otros dos motivos son la excepción.',cv('cMot'))}
- ${panel('col6','riesgo','Motivos distintos de "Saldos", por mes','Prendas "No aceptados por cliente" o "Fuera de fecha de embarque", por mes, con el filtro actual.',cv('cMot2'))}
- ${panel('col12','riesgo','Motivo por cliente','Prendas por motivo. % no estándar = (no aceptados + fuera de fecha) ÷ total de prendas en saldo de ese cliente.',table(['Cliente',...mots,'Total','% no estándar'],rows,mots.map((_,i)=>i+1).concat([mots.length+1,mots.length+2])))}</div>`;
- mk('cMot',barsCfg(mots,ys.map(y=>({label:yl(y),backgroundColor:YC[y],data:mots.map(m=>sum(B.filter(r=>r.y===y&&r.mo===m)))})),false));
- const ex=B.filter(r=>r.mo!==mots[0]),tl=timeline(ys);
- mk('cMot2',barsCfg(tl.map(tlab),mots.slice(1).map((m,i)=>({label:m,backgroundColor:ROT[i],data:tl.map(t=>sum(ex.filter(r=>r.mo===m&&r.y===t[0]&&r.m===t[1])))})),false));
-}
-function pCli(A,B,ys){
- const gs=group(B,'c'),cls=gs.map(o=>o.k).slice(0,8);
- const rows=gs.map(o=>{const q=y=>sum(B.filter(r=>r.c===o.k&&r.y===y)),w=y=>sum(B.filter(r=>r.c===o.k&&r.y===y&&r.m>=6&&r.m<=9)),a=w(2025),b=w(2026);return [esc(o.k),fmt(q(2025)),fmt(q(2026)),fmt(o.q),fmt(a),fmt(b),a?((b-a)/a*100).toLocaleString('es-PE',{maximumFractionDigits:1})+'%':'—'];});
- document.getElementById('p2').innerHTML=`<div class="grid">${panel('col12','volumen','Prendas en saldo por cliente y año','Una barra por año para cada cliente (8 mayores). Etiqueta = prendas.',cv('cCA',true))}
- ${panel('col12','volumen','Detalle por cliente','Jun–Sep compara los 4 meses completos de ambos años. Var. = (2026 − 2025) ÷ 2025, sobre jun–sep. El total de 2025 solo cubre jun–oct, así que no es comparable con el de 2026.',table(['Cliente','2025 (jun–oct)','2026 (ene–oct)','Total','Jun–Sep 2025','Jun–Sep 2026','Var.'],rows,[1,2,3,4,5,6]))}</div>`;
- mk('cCA',barsCfg(cls,ys.map(y=>({label:yl(y),backgroundColor:YC[y],data:cls.map(c=>sum(B.filter(r=>r.c===c&&r.y===y)))})),false));
-}
-function pProd(A,B,ys){
- const es=group(A,'e').slice(0,15),co=group(A,'co').slice(0,10);
- const ts=[...new Set(D.map(r=>r.t))].sort((a,b)=>(TALLAS.indexOf(a)<0?99:TALLAS.indexOf(a))-(TALLAS.indexOf(b)<0?99:TALLAS.indexOf(b)));
- document.getElementById('p3').innerHTML=`<div class="grid">${panel('col6','volumen','Estilos con más saldo','15 estilos con más prendas en saldo (filtro actual).',cv('cEs',true))}
- ${panel('col6','volumen','Colores con más saldo','10 colores con más prendas en saldo (filtro actual).',cv('cCo',true))}
- ${panel('col12','volumen','Saldo por talla','Prendas por talla, un color por año. Las tallas se muestran como vienen del sistema (XXS y 2XS aparecen separadas).',cv('cTa'))}</div>`;
- mk('cEs',barsCfg(es.map(o=>o.k),[{label:'Prendas',data:es.map(o=>o.q),backgroundColor:'#B45309'}],true));
- mk('cCo',barsCfg(co.map(o=>o.k),[{label:'Prendas',data:co.map(o=>o.q),backgroundColor:'#4E6B78'}],true));
- mk('cTa',barsCfg(ts,ys.map(y=>({label:yl(y),backgroundColor:YC[y],data:ts.map(t=>sum(B.filter(r=>r.t===t&&r.y===y)))})),false));
-}
-function pAtk(A,tot){
- const op=group(A,'op').slice(0,8).map(o=>{const r=A.find(x=>x.op===o.k);o.nm='OP '+o.k;o.sb=r.c+' · '+r.e;return o;});
- const es=group(A,'e').slice(0,8).map(o=>{const r=A.find(x=>x.e===o.k);o.nm=o.k;o.sb=r.c+' · '+o.ops.size+' OPs';return o;});
- const nz=A.filter(r=>r.mo!=='Saldos');
- const mo=group(nz,'op').slice(0,8).map(o=>{const r=nz.find(x=>x.op===o.k);o.nm='OP '+o.k;o.sb=r.c+' · '+r.mo;return o;});
- document.getElementById('p4').innerHTML=`<div class="grid">${panel('col4','riesgo','Órdenes (OP) con más saldo','8 OPs con más prendas en saldo.',rank(op,tot))}
- ${panel('col4','riesgo','Estilos con más saldo','8 estilos con más prendas en saldo.',rank(es,tot))}
- ${panel('col4','riesgo','OPs con saldo no estándar','8 OPs con prendas "No aceptados por cliente" o "Fuera de fecha de embarque".',rank(mo,tot))}</div>`;
+function pCli(A,B,ys,tot,ops){
+ const gs=group(A,'c'),g8=gs.slice(0,8);
+ const rows=gs.map(o=>{const x=ops.filter(p=>p.c===o.k),qr=x.filter(p=>p.v>1).reduce((s,p)=>s+p.q,0),nz=x.reduce((s,p)=>s+p.nz,0);
+  return [esc(o.k),fmt(sum(B.filter(r=>r.c===o.k&&r.y===2025))),fmt(sum(B.filter(r=>r.c===o.k&&r.y===2026))),fmt(o.q),pct(o.q,tot),fmt(x.length),pct(qr,o.q),fmt(nz)];});
+ const es=group(A,'e'),e50=top50(es,tot).length,e15=es.slice(0,15);
+ document.getElementById('p2').innerHTML=`<div class="grid">${panel('col4','volumen','Saldo por cliente','Prendas en saldo con el filtro actual, 8 mayores. Etiqueta = prendas.',cv('cCli',true))}
+ ${panel('col8','volumen','Detalle por cliente','2025 (jun–oct) y 2026 (ene–oct) son volumen de prendas: sin producción por OP no se puede decir si un cliente mejora o empeora. % del saldo = sobre las prendas del filtro. % que reaparece = prendas en OPs con saldo en más de una fecha ÷ prendas del cliente. No estándar = prendas no aceptadas por el cliente o fuera de fecha.',table(['Cliente','2025','2026','Prendas (filtro)','% del saldo','OPs','% que reaparece','No estándar'],rows,[1,2,3,4,5,6,7]))}
+ ${panel('col12','volumen','Estilos con más saldo',`${e50} de ${es.length} estilos suman el 50% de las prendas en saldo del filtro. 15 estilos con más prendas.`,cv('cEs',true))}</div>`;
+ mk('cCli',barsCfg(g8.map(o=>o.k),[{label:'Prendas',data:g8.map(o=>o.q),backgroundColor:'#4E6B78'}],true));
+ mk('cEs',barsCfg(e15.map(o=>o.k),[{label:'Prendas',data:e15.map(o=>o.q),backgroundColor:'#B45309'}],true));
 }
 function detRows(){const q=S.q.trim().toLowerCase();let a=sel();if(q)a=a.filter(r=>(r.op+' '+r.po+' '+r.e+' '+r.co+' '+r.c+' '+r.t+' '+r.mo).toLowerCase().includes(q));return a.slice().sort((x,y)=>y.f.localeCompare(x.f)||x.op.localeCompare(y.op));}
 function pDet(){
  const a=detRows(),filtrado=S.y!=='all'||S.c||S.m||S.q.trim(),v=filtrado?a:a.slice(0,500);
  const rows=v.map(r=>[r.f.slice(8)+'/'+r.f.slice(5,7)+'/'+r.f.slice(0,4),esc(r.c),esc(r.po),esc(r.op),esc(r.e),esc(r.co),esc(r.t),esc(r.mo),fmt(r.q)]);
- document.getElementById('p5').innerHTML=`<div class="grid">${panel('col12','','Detalle de saldos','Un registro = una OP, talla y color con saldo. Lo más reciente arriba.',table(['Fecha','Cliente','PO','OP','Estilo','Color','Talla','Motivo','Prendas'],rows,[8])+(!filtrado&&a.length>500?`<div class="lsTope500">Se muestran los 500 registros más recientes de ${a.length.toLocaleString('es-PE')}. Usa los filtros para ver los demás.</div>`:''))}</div>`;
+ document.getElementById('p3').innerHTML=`<div class="grid">${panel('col12','','Detalle de saldos','Un registro = una OP, talla y color con saldo. Lo más reciente arriba.',table(['Fecha','Cliente','PO','OP','Estilo','Color','Talla','Motivo','Prendas'],rows,[8])+(!filtrado&&a.length>500?`<div class="lsTope500">Se muestran los 500 registros más recientes de ${a.length.toLocaleString('es-PE')}. Usa los filtros para ver los demás.</div>`:''))}</div>`;
 }
 function plegar(){const mv=matchMedia('(max-width:600px)').matches;document.querySelectorAll('.panel').forEach(p=>{if(!p.querySelector('table'))return;if(!mv){p.classList.remove('plegable','plegado');return;}if(p.classList.contains('plegable'))return;p.classList.add('plegable','plegado');const b=document.createElement('button');b.type='button';b.className='verdet';b.textContent='Ver tabla';b.onclick=()=>{const s=p.classList.toggle('plegado');b.textContent=s?'Ver tabla':'Ocultar tabla';};p.appendChild(b);});}
 
