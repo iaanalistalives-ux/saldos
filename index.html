@@ -137,6 +137,13 @@ tr.clk{cursor:pointer;}tr.clk:hover td{background:#E7F4EF;}
 @media(max-width:1100px){.col5,.col7{grid-column:span 12;}}
 @media(max-width:900px){.col5,.col7{grid-column:span 12;}}
 .kpi .s{line-height:1.35;}
+
+.bar .seg+.lbl{margin-left:4px;}
+.mut{color:#8a9b96;}.hi{color:var(--rose);font-weight:700;}.lo{color:var(--sage);font-weight:700;}
+.col5{grid-column:span 5;}.col7{grid-column:span 7;}
+@media(max-width:1100px){.col5,.col7{grid-column:span 12;}}
+@media(max-width:900px){.col5,.col7{grid-column:span 12;}}
+.kpi .s{line-height:1.35;}
 </style>
 </head>
 <body>
@@ -499,10 +506,12 @@ const guiaEsc={id:'guiaEsc',afterDatasetsDraw(ch){const o=ch.data.avg,c=ch.ctx,a
 
 function mk(id,cfg,arr){const el=document.getElementById(id);if(!el)return;(arr||CH).push(new Chart(el,cfg));}
 function barsCfg(labels,sets,dim,fm){return {type:'bar',data:{labels,datasets:sets.map(s=>Object.assign({borderRadius:4,maxBarThickness:18},s)),fm},
- options:{indexAxis:'y',layout:{padding:{right:92}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.lbl?c.dataset.lbl[c.dataIndex]:(fm||fmt)(c.parsed.x)}}},scales:{x:{beginAtZero:true,grace:'8%',ticks:{callback:v=>(fm||fmt)(v)}},y:{grid:{display:false},ticks:{autoSkip:false}}},
+ options:{indexAxis:'y',layout:{padding:{right:150}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.lbl?c.dataset.lbl[c.dataIndex]:(fm||fmt)(c.parsed.x)}}},scales:{x:{beginAtZero:true,grace:'8%',ticks:{callback:v=>(fm||fmt)(v)}},y:{grid:{display:false},ticks:{autoSkip:false}}},
   onClick:(e,els,ch)=>{if(dim&&els.length)abrir(dim,ch.data.labels[els[0].index]);},
   onHover:(e,els)=>{if(dim&&e.native&&e.native.target)e.native.target.style.cursor=els.length?'pointer':'default';}},plugins:[valBarras]};}
 
+/* color por tasa contra el promedio; gris = poca base de exportadas */
+const colT=(o,avg)=>(o.x>0&&o.x>=S.min&&avg)?(o.rate>=avg*1.5?'#DC2626':o.rate<=avg*.67?'#0F7A5A':'#4E6B78'):'#B7C4C0';
 /* ---------- helpers de panel ---------- */
 const panel=(cls,tira,t,h,body,id)=>`<div class="panel ${cls}"${id?` id="${id}"`:''}><span class="tira ${tira}"></span><div class="pt">${t}</div><div class="ph">${h}</div>${body}</div>`;
 const cv=(id,tall)=>`<div class="cwrap${tall?' tall':''}"><canvas id="${id}"></canvas></div>`;
@@ -607,30 +616,38 @@ function pCli(A,B,T){
   return {k:o.k,a:[lk('c',o.k),fmt(a5.q),fmt(a6.q),a5.x?pr(a5.q,a5.x):'—',a6.x?pr(a6.q,a6.x):'—',fmt(o.q),fmt(o.x),rc(o,avg),pct(o.q,T.q),fmt(opsC.length),pct(qr,o.q),fmt(nz)]};});
  const heads=['Cliente','Saldo 2025','Saldo 2026','Tasa 2025','Tasa 2026','Saldo (filtro)','Exportadas (filtro)','Tasa (filtro)','% del saldo','OPs','% que reaparece','No estándar'];
  const tb=`<div class="tw"><table><thead><tr>${heads.map((h,i)=>`<th class="${i?'r':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="clk" data-d="c" data-k="${esc(r.k)}">${r.a.map((c,i)=>`<td class="${i?'r':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
- const cr=gs.filter(o=>o.x>0&&o.x>=S.min).sort((a,b)=>b.rate-a.rate).slice(0,12);
- const top=(key,n)=>{const s=stats(A,key);return {s,top:s.slice(0,n),n50:top50(s,T.q).length};};
+ const R=S.ord==='r',avg2=T.rate;
+ const lista=(a)=>R?a.filter(o=>o.x>0&&o.x>=S.min).sort((x,y)=>y.rate-x.rate||y.q-x.q):a.slice().sort((x,y)=>y.q-x.q);
+ const bset=L=>[{label:R?'Tasa de saldo':'Prendas en saldo',data:L.map(o=>R?+(o.rate*100).toFixed(2):o.q),backgroundColor:L.map(o=>colT(o,avg2)),lbl:L.map(o=>R?`${pr(o.q,o.x)} (${fmt(o.q)} de ${fmt(o.x)})`:`${fmt(o.q)} · tasa ${o.x?pr(o.q,o.x):'s/d'}`)}];
+ const fB=R?pf:fmt,cr=lista(gs).slice(0,12);
+ const top=(key,n)=>{const s=stats(A,key),el=lista(s);return {s,el,top:el.slice(0,n)};};
  const G=top('g',15),EP=top('ep',15),E=top('e',15);
- const ph=(x,nm)=>`${x.n50} de ${x.s.length} ${nm} suman el 50% de las prendas en saldo del filtro. 15 con más prendas; la etiqueta muestra prendas en saldo y, entre paréntesis, la tasa de saldo. Clic en una barra para ver su detalle.`;
- const bs=(L,color)=>[{label:'Prendas',data:L.map(o=>o.q),backgroundColor:color,lbl:L.map(o=>`${fmt(o.q)} (${o.x?pr(o.q,o.x):'s/d'})`)}];
- document.getElementById('p2').innerHTML=`<div class="grid">${panel('col5','riesgo','Tasa de saldo por cliente',`Saldo ÷ exportadas con el filtro actual, clientes con al menos ${fmt(S.min)} prendas exportadas (la etiqueta es la tasa). Promedio del filtro: ${pr(T.q,T.x)}. Clic en una barra para ver su detalle.`,cr.length?cv('cCli',true):'<div class="vacio2">Ningún cliente llega al mínimo de exportadas. Baja el mínimo en la barra.</div>')}
- ${panel('col7','volumen','Detalle por cliente','Tasa = saldo ÷ prendas exportadas de las líneas con saldo. 2025 y 2026 se muestran siempre; las columnas "(filtro)" siguen el año y los filtros de la barra. % del saldo = sobre las prendas del filtro. % que reaparece = prendas en OPs con saldo en más de una fecha ÷ prendas del cliente. No estándar = prendas no aceptadas por el cliente o fuera de fecha. Gris = poca base de exportadas.',tb)}
- ${panel('col6','volumen','Grupos con más saldo',ph(G,'grupos'),cv('cGr',true))}
- ${panel('col6','volumen','Estilos propios con más saldo',ph(EP,'estilos propios'),cv('cEp',true))}
- ${panel('col12','volumen','Estilos cliente con más saldo',ph(E,'estilos cliente'),cv('cEs',true))}</div>`;
- if(cr.length)mk('cCli',barsCfg(cr.map(o=>o.k),[{label:'Tasa de saldo',data:cr.map(o=>+(o.rate*100).toFixed(2)),backgroundColor:cr.map(o=>o.rate>=avg*1.5?'#DC2626':o.rate<=avg*.67?'#0F7A5A':'#4E6B78')}],'c',pf));
- mk('cGr',barsCfg(G.top.map(o=>o.k),bs(G.top,'#0F7A5A'),'g'));
- mk('cEp',barsCfg(EP.top.map(o=>o.k),bs(EP.top,'#2F6FB5'),'ep'));
- mk('cEs',barsCfg(E.top.map(o=>o.k),bs(E.top,'#B45309'),'e'));
+ const tt=R?'Mayor tasa de saldo':'Más prendas en saldo',leg=R?`Largo de la barra = tasa de saldo (saldo ÷ exportadas); solo con al menos ${fmt(S.min)} exportadas. La etiqueta es la tasa y, entre paréntesis, saldo de exportadas.`:'Largo de la barra = prendas en saldo (volumen); la etiqueta agrega la tasa de saldo (saldo ÷ exportadas).';
+ const col=` Color = tasa contra el promedio del filtro (${pr(T.q,T.x)}): rojo 1,5 veces o más, verde dos tercios o menos, gris en medio o con poca base. Cambia entre volumen y tasa con "Ordenar por".`;
+ const ph=(nm)=>`15 ${nm}. ${leg}${col} Clic en una barra para ver su detalle.`;
+ document.getElementById('p2').innerHTML=`<div class="grid">${panel('col5','riesgo','Clientes · '+tt.toLowerCase(),`${leg}${col} Clic en una barra para ver su detalle.`,cr.length?cv('cCli',true):'<div class="vacio2">Ningún cliente llega al mínimo de exportadas. Baja el mínimo en la barra.</div>')}
+ ${panel('col7','volumen','Detalle por cliente','Saldo y tasa lado a lado. Tasa = saldo ÷ prendas exportadas de las líneas con saldo. 2025 y 2026 se muestran siempre; las columnas "(filtro)" siguen el año y los filtros de la barra. % del saldo = sobre las prendas del filtro. % que reaparece = prendas en OPs con saldo en más de una fecha ÷ prendas del cliente. No estándar = prendas no aceptadas por el cliente o fuera de fecha. Gris = poca base de exportadas.',tb)}
+ ${panel('col6','volumen','Grupos · '+tt.toLowerCase(),ph('grupos'),cv('cGr',true))}
+ ${panel('col6','volumen','Estilos propios · '+tt.toLowerCase(),ph('estilos propios'),cv('cEp',true))}
+ ${panel('col12','volumen','Estilos cliente · '+tt.toLowerCase(),ph('estilos cliente'),cv('cEs',true))}</div>`;
+ if(cr.length)mk('cCli',barsCfg(cr.map(o=>o.k),bset(cr),'c',fB));
+ mk('cGr',barsCfg(G.top.map(o=>o.k),bset(G.top),'g',fB));
+ mk('cEp',barsCfg(EP.top.map(o=>o.k),bset(EP.top),'ep',fB));
+ mk('cEs',barsCfg(E.top.map(o=>o.k),bset(E.top),'e',fB));
 }
 function pTal(A,T){
- const avg=T.rate,ts=stats(A,'t').sort((a,b)=>{const i=TALLAS.indexOf(a.k),j=TALLAS.indexOf(b.k);return (i<0?99:i)-(j<0?99:j)||b.q-a.q;}),co=stats(A,'co').slice(0,15),mo=stats(A,'mo');
- const tt=ts.filter(o=>o.x>0&&o.x>=S.min);
- const cols=[{h:'Motivo',f:o=>esc(o.k)},{h:'Prendas',r:1,f:o=>fmt(o.q)},{h:'% del saldo',r:1,f:o=>pct(o.q,T.q)},{h:'Registros',r:1,f:o=>fmt(o.n)},{h:'OPs',r:1,f:o=>fmt(o.ops.size)}];
- document.getElementById('p3').innerHTML=`<div class="grid">${panel('col6','riesgo','Tasa de saldo por talla',`Saldo ÷ exportadas de cada talla, con al menos ${fmt(S.min)} prendas exportadas. La etiqueta es la tasa y, entre paréntesis, las prendas en saldo. Promedio del filtro: ${pr(T.q,T.x)}.`,tt.length?cv('cTa',true):'<div class="vacio2">Ninguna talla llega al mínimo de exportadas.</div>')}
- ${panel('col6','volumen','Colores con más saldo','15 colores con más prendas en saldo; la etiqueta muestra prendas y, entre paréntesis, la tasa de saldo.',cv('cCo',true))}
+ const avg=T.rate,R=S.ord==='r',ts=stats(A,'t').sort((a,b)=>{const i=TALLAS.indexOf(a.k),j=TALLAS.indexOf(b.k);return (i<0?99:i)-(j<0?99:j)||b.q-a.q;}),mo=stats(A,'mo');
+ const co=(R?stats(A,'co').filter(o=>o.x>0&&o.x>=S.min).sort((a,b)=>b.rate-a.rate||b.q-a.q):stats(A,'co')).slice(0,15);
+ const tt=R?ts.filter(o=>o.x>0&&o.x>=S.min):ts,fB=R?pf:fmt;
+ const bset=L=>[{label:R?'Tasa de saldo':'Prendas en saldo',data:L.map(o=>R?+(o.rate*100).toFixed(2):o.q),backgroundColor:L.map(o=>colT(o,avg)),lbl:L.map(o=>R?`${pr(o.q,o.x)} (${fmt(o.q)} de ${fmt(o.x)})`:`${fmt(o.q)} · tasa ${o.x?pr(o.q,o.x):'s/d'}`)}];
+ const leg=R?`Largo de la barra = tasa de saldo (saldo ÷ exportadas); solo con al menos ${fmt(S.min)} exportadas.`:'Largo de la barra = prendas en saldo (volumen); la etiqueta agrega la tasa de saldo (saldo ÷ exportadas).';
+ const col=` Color = tasa contra el promedio del filtro (${pr(T.q,T.x)}): rojo 1,5 veces o más, verde dos tercios o menos, gris en medio o con poca base. Cambia entre volumen y tasa con "Ordenar por".`;
+ const cols=[{h:'Motivo',f:o=>esc(o.k)},{h:'Prendas',r:1,f:o=>fmt(o.q)},{h:'Exportadas',r:1,f:o=>fmt(o.x)},{h:'Tasa de saldo',r:1,f:o=>rc(o,avg)},{h:'% del saldo',r:1,f:o=>pct(o.q,T.q)},{h:'Registros',r:1,f:o=>fmt(o.n)},{h:'OPs',r:1,f:o=>fmt(o.ops.size)}];
+ document.getElementById('p3').innerHTML=`<div class="grid">${panel('col6','riesgo','Tallas · '+(R?'mayor tasa de saldo':'prendas en saldo'),`En el orden de las tallas. ${leg}${col}`,tt.length?cv('cTa',true):'<div class="vacio2">Ninguna talla llega al mínimo de exportadas.</div>')}
+ ${panel('col6','volumen','Colores · '+(R?'mayor tasa de saldo':'más prendas en saldo'),`15 colores. ${leg}${col}`,cv('cCo',true))}
  ${panel('col12','volumen','Motivo del saldo','Solo el motivo "Saldos" no dice la causa; "No aceptados por cliente" y "Fuera de fecha de embarque" sí. El motivo se filtra desde la barra.',tbl(cols,mo,null))}</div>`;
- if(tt.length)mk('cTa',barsCfg(tt.map(o=>o.k),[{label:'Tasa de saldo',data:tt.map(o=>+(o.rate*100).toFixed(2)),backgroundColor:tt.map(o=>o.rate>=avg*1.5?'#DC2626':o.rate<=avg*.67?'#0F7A5A':'#4E6B78'),lbl:tt.map(o=>`${pr(o.q,o.x)} (${fmt(o.q)})`)}],null,pf));
- mk('cCo',barsCfg(co.map(o=>o.k),[{label:'Prendas',data:co.map(o=>o.q),backgroundColor:'#8E44AD',lbl:co.map(o=>`${fmt(o.q)} (${o.x?pr(o.q,o.x):'s/d'})`)}],null));
+ if(tt.length)mk('cTa',barsCfg(tt.map(o=>o.k),bset(tt),null,fB));
+ mk('cCo',barsCfg(co.map(o=>o.k),bset(co),null,fB));
 }
 function detRows(){return sel().slice().sort((x,y)=>y.f.localeCompare(x.f)||x.op.localeCompare(y.op));}
 function filasDet(v){return `<div class="tw alto"><table><thead><tr>${['Fecha','Cliente','Grupo','OP','PO','Estilo propio','Estilo cliente','Color','Talla','Motivo','Saldo','Exportadas de la línea','% saldo de la línea'].map((h,i)=>`<th class="${i>=10?'r':''}">${h}</th>`).join('')}</tr></thead><tbody>${v.map(r=>`<tr><td>${fdate(r.f)}</td><td>${lk('c',r.c)}</td><td>${lk('g',r.g)}</td><td>${lk('op',r.op,r.op)}</td><td>${lk('po',r.po,r.po)}</td><td>${lk('ep',r.ep)}</td><td>${lk('e',r.e)}</td><td>${esc(r.co)}</td><td>${esc(r.t)}</td><td>${esc(r.mo)}</td><td class="r">${fmt(r.q)}</td><td class="r">${fmt(r.x)}</td><td class="r">${r.x?pr(r.q,r.x):'—'}</td></tr>`).join('')}</tbody></table></div>`;}
@@ -659,11 +676,12 @@ function volverM(){if(M.stack.length>1){M.stack.pop();M.tab=0;renderM();}}
 function minitabla(dim,R,qE,avg){
  const s=stats(R,dim);let items=s;
  if(dim==='f')items=s.slice().sort((a,b)=>b.k.localeCompare(a.k));
+ else if(dim!=='t')items=s.slice().sort((a,b)=>{const ea=a.x>=S.min&&a.x>0,eb=b.x>=S.min&&b.x>0;return ea!==eb?(ea?-1:1):ea?b.rate-a.rate||b.q-a.q:b.q-a.q;});
  else if(dim==='t')items=s.slice().sort((a,b)=>{const i=TALLAS.indexOf(a.k),j=TALLAS.indexOf(b.k);return (i<0?99:i)-(j<0?99:j)||b.q-a.q;});
  const nav=NAV.has(dim),LIM=10;
- const rows=items.map((o,i)=>`<tr${nav?` class="clk${i>=LIM?' mas':''}" data-d="${dim}" data-k="${esc(o.k)}"`:(i>=LIM?' class="mas"':'')}><td>${nav?lk(dim,o.k):esc(o.k)}</td><td class="r">${fmt(o.q)}</td><td class="r">${pct(o.q,qE)}</td><td class="r">${fmt(o.x)}</td><td class="r">${rc(o,avg)}</td></tr>`).join('');
+ const rows=items.map((o,i)=>`<tr${nav?` class="clk${i>=LIM?' mas':''}" data-d="${dim}" data-k="${esc(o.k)}"`:(i>=LIM?' class="mas"':'')}><td>${nav?lk(dim,o.k):esc(o.k)}</td><td class="r">${fmt(o.q)}</td><td class="r">${fmt(o.x)}</td><td class="r">${rc(o,avg)}</td><td class="r">${pct(o.q,qE)}</td></tr>`).join('');
  const ver=items.length>LIM?`<button type="button" class="verm">Ver todos (${items.length})</button>`:'';
- return `<div class="panel col6 mini"><span class="tira volumen"></span><div class="pt">${NM[dim]} <span class="cnt">${items.length}</span></div><div class="tw"><table><thead><tr><th>${NM[dim]}</th><th class="r">Saldo</th><th class="r">% de la selección</th><th class="r">Exportadas</th><th class="r">Tasa</th></tr></thead><tbody>${rows}</tbody></table></div>${ver}</div>`;
+ return `<div class="panel col6 mini"><span class="tira volumen"></span><div class="pt">${NM[dim]} <span class="cnt">${items.length}</span></div><div class="tw"><table><thead><tr><th>${NM[dim]}</th><th class="r">Saldo</th><th class="r">Exportadas</th><th class="r">Tasa</th><th class="r">% del saldo</th></tr></thead><tbody>${rows}</tbody></table></div>${ver}</div>`;
 }
 function renderM(){
  MC.forEach(c=>c.destroy());MC=[];
