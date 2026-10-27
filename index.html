@@ -144,6 +144,13 @@ tr.clk{cursor:pointer;}tr.clk:hover td{background:#E7F4EF;}
 @media(max-width:1100px){.col5,.col7{grid-column:span 12;}}
 @media(max-width:900px){.col5,.col7{grid-column:span 12;}}
 .kpi .s{line-height:1.35;}
+
+.bar .seg+.lbl{margin-left:4px;}
+.mut{color:#8a9b96;}.hi{color:var(--rose);font-weight:700;}.lo{color:var(--sage);font-weight:700;}
+.col5{grid-column:span 5;}.col7{grid-column:span 7;}
+@media(max-width:1100px){.col5,.col7{grid-column:span 12;}}
+@media(max-width:900px){.col5,.col7{grid-column:span 12;}}
+.kpi .s{line-height:1.35;}
 </style>
 </head>
 <body>
@@ -573,16 +580,17 @@ function pAtk(A,T,st,t50,rec,sr){
  const eli=A.length?st.filter(o=>o.x>0&&o.x>=S.min):[];
  const hay=eli.length>=3;
  document.getElementById('p0').innerHTML=`<div class="grid">${panel('col12','riesgo',`${DLP[d]} que concentran el saldo`,`${porR?`Ordenado por tasa de saldo, solo ${DLP[d].toLowerCase()} con al menos ${fmt(S.min)} prendas exportadas (${fmt(ocultos)} quedan fuera por tener menos o ninguna). `:`${t50.length} de ${st.length} ${DLP[d].toLowerCase()} suman el 50% de las prendas en saldo del filtro${t50.length>40?' (se muestran las 40 mayores)':''}. `}Tasa de saldo = saldo ÷ prendas exportadas de las líneas (OP · PO · color · talla) con saldo; promedio del filtro ${pr(tot,T.x)}. Rojo = 1,5 veces el promedio o más; verde = dos tercios o menos; gris = menos de ${fmt(S.min)} exportadas (poca base). Cambia el orden y el mínimo en la barra. Clic en una fila para ver su detalle.`,tbl(cols,lim,o=>[d,o.k]).replace('class="tw"','class="tw alto"'),'pn-ops')}
- ${panel('col8','riesgo',`Volumen exportado contra tasa de saldo, por ${DL[d].toLowerCase()}`,`Cada burbuja es ${DL[d].toLowerCase()} (las 80 con más saldo y al menos ${fmt(S.min)} exportadas). Más a la derecha = más prendas exportadas; más arriba = más saldo por prenda exportada; burbuja grande = más prendas en saldo. Arriba de la línea punteada está peor que el promedio (${pr(tot,T.x)}). Clic en una burbuja para ver su detalle.`,hay?cv('cEsc',true):'<div class="vacio2">Muy pocos elementos con la base mínima de exportadas para dibujar el gráfico. Baja el mínimo en la barra.</div>','pn-esc')}
+ ${panel('col8','riesgo',`Saldo real contra saldo esperado, por ${DL[d].toLowerCase()}`,`Las 12 ${DLP[d].toLowerCase()} (con al menos ${fmt(S.min)} exportadas) que más se pasan de lo normal. Barra de color = prendas en saldo que tuvo; barra gris = las que tendría si saldara como el promedio (${pr(tot,T.x)} de lo exportado). Mientras más larga la barra de color sobre la gris, peor. Rojo = 1,5 veces el promedio o más. Clic en una barra para ver su detalle.`,hay?'<div class="cwrap" style="height:470px"><canvas id="cEsc"></canvas></div>':'<div class="vacio2">Muy pocos elementos con la base mínima de exportadas para dibujar el gráfico. Baja el mínimo en la barra.</div>','pn-esc')}
  ${panel('col4','riesgo','Prendas de saldo sobre el promedio',`Saldo que sobra frente a lo esperado si ${DL[d].toLowerCase()} tuviera la tasa promedio (${pr(tot,T.x)}): saldo − promedio × exportadas. Las 8 con más prendas por encima.`,rank(exc),'pn-exc')}
  ${panel('col6','riesgo','Saldo puntual contra saldo que reaparece',`Si ${DL[d].toLowerCase()} vuelve a dejar saldo en otra fecha, es saldo que no se cerró. % de las prendas = sobre ${fmt(tot)}. Tasa = saldo ÷ exportadas del grupo.`,table([DLP[d],'Cantidad','Prendas','% de las prendas','Tasa de saldo','Mediana entre 1ª y última'],bk,[1,2,3,4,5]),'pn-reap')}
  ${panel('col6','riesgo','Líneas con más saldo que exportado',`OP · color · talla donde las prendas en saldo superan las exportadas (o no se exportó ninguna). Las 8 con más saldo de ${fmt(sr.length)} líneas. Clic para ver la OP.`,rank(srl),'pn-sr')}
  ${nz.length?panel('col12','riesgo','Con saldo no aceptado o fuera de fecha',`Las únicas prendas con causa registrada: "No aceptados por cliente" o "Fuera de fecha de embarque". ${nz.length} ${DLP[d].toLowerCase()} con más prendas.`,rank(nz),'pn-nz'):''}</div>`;
- if(hay){const pts=eli.slice(0,80).map(o=>({x:o.x,y:+(o.rate*100).toFixed(3),r:Math.max(4,Math.min(24,3+Math.sqrt(o.q)/2)),q:o.q,nm:lab(d,o.k),k:o.k})),colr=p=>p.y>=avg*150?'rgba(220,38,38,.55)':p.y<=avg*67?'rgba(15,122,90,.55)':'rgba(78,107,120,.55)';
-  mk('cEsc',{type:'bubble',data:{datasets:[{data:pts,backgroundColor:pts.map(colr),borderColor:pts.map(colr).map(x=>x.replace('.55','1')),borderWidth:1}],avg:avg*100},
-   options:{layout:{padding:{top:14,right:16}},plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].raw.nm,label:i=>[`Saldo: ${fmt(i.raw.q)} prendas`,`Exportadas: ${fmt(i.raw.x)}`,`Tasa de saldo: ${pf(i.raw.y)}`]}}},
-    scales:{x:{type:'logarithmic',title:{display:true,text:'Prendas exportadas (escala logarítmica)'},ticks:{callback:v=>/^[125]0*$/.test(String(v))?fmt(v):''}},y:{beginAtZero:true,grace:'8%',title:{display:true,text:'Tasa de saldo'},ticks:{callback:v=>pf(v)}}},
-    onClick:(e,els,ch)=>{if(els.length)abrir(d,ch.data.datasets[0].data[els[0].index].k);},onHover:(e,els)=>{if(e.native&&e.native.target)e.native.target.style.cursor=els.length?'pointer':'default';}},plugins:[guiaEsc]});}
+ if(hay){const top=eli.map(o=>({o,e:o.q-avg*o.x})).filter(z=>z.e>0).sort((p,q)=>q.e-p.e).slice(0,12),ks=top.map(z=>z.o.k);
+  mk('cEsc',{type:'bar',data:{labels:top.map(z=>lab(d,z.o.k)),datasets:[{label:'Saldo real',data:top.map(z=>z.o.q),backgroundColor:top.map(z=>z.o.q/z.o.x>=avg*1.5?'#DC2626':'#E07B00'),borderRadius:3},{label:'Saldo esperado con la tasa promedio',data:top.map(z=>Math.round(avg*z.o.x)),backgroundColor:'#B7C4C0',borderRadius:3}]},
+   options:{indexAxis:'y',categoryPercentage:.9,barPercentage:.95,layout:{padding:{right:70}},plugins:{legend:{display:true,position:'bottom'},tooltip:{callbacks:{afterTitle:i=>{const z=top[i[0].dataIndex];return `Exportadas: ${fmt(z.o.x)} · tasa ${pf(z.o.q/z.o.x*100)}`;}}},datalabels:false},
+    scales:{x:{beginAtZero:true,title:{display:true,text:'Prendas en saldo'},ticks:{callback:v=>fmt(v)}},y:{ticks:{autoSkip:false}}},
+    onClick:(e,els)=>{if(els.length)abrir(d,ks[els[0].index]);},onHover:(e,els)=>{if(e.native&&e.native.target)e.native.target.style.cursor=els.length?'pointer':'default';}},
+   plugins:[{id:'etq',afterDatasetsDraw(ch){const c=ch.ctx;c.save();c.font='600 11px sans-serif';c.fillStyle=getComputedStyle(document.body).color;c.textBaseline='middle';ch.data.datasets.forEach((ds,i)=>ch.getDatasetMeta(i).data.forEach((b,j)=>c.fillText(fmt(ds.data[j]),b.x+4,b.y)));c.restore();}}]});}
 }
 function pTend(A,B,ys,T){
  const ser=y=>MES.map((_,i)=>{const r=B.filter(x=>x.y===y&&x.m===i+1);return r.length?agg(r):null;});
