@@ -145,8 +145,7 @@ tr.clk{cursor:pointer;}tr.clk:hover td{background:#E7F4EF;}
    <select id="fC"></select>
    <select id="fM"></select>
    <select id="fMes"></select>
-   <label class="lbl" for="fD1">Desde</label><input type="date" id="fD1">
-   <label class="lbl" for="fD2">Hasta</label><input type="date" id="fD2">
+   <select id="fSem"></select>
    <input type="text" id="fG" list="dlG" placeholder="Grupo" autocomplete="off">
    <input type="text" id="fEp" list="dlEp" placeholder="Estilo propio" autocomplete="off">
    <input type="text" id="fE" list="dlE" placeholder="Estilo cliente" autocomplete="off">
@@ -421,7 +420,8 @@ const DLP={g:'Grupos',op:'OPs',po:'POs',ep:'Estilos propios',e:'Estilos cliente'
 const NM=Object.assign({f:'Fecha',co:'Color',t:'Talla',mo:'Motivo'},DL);
 const DORD=['g','op','po','ep','e','c'];
 const NAV=new Set(['g','op','po','ep','e','c','f']);
-const D=RAW.map(a=>{const r={f:a[0],y:+a[0].slice(0,4),m:+a[0].slice(5,7),c:a[1],mo:a[2],e:a[3],ep:a[4],g:a[5],op:a[6],po:a[7],co:a[8],t:a[9],q:a[10]};r.h=(r.op+' '+r.po+' '+r.e+' '+r.ep+' '+r.g+' '+r.co+' '+r.c+' '+r.t+' '+r.mo).toLowerCase();return r;});
+function isoSem(f){const d=new Date(f+'T00:00:00Z'),dia=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-dia+3);const y=d.getUTCFullYear(),j=new Date(Date.UTC(y,0,4)),w=1+Math.round(((d-j)/864e5-3+((j.getUTCDay()+6)%7))/7);return y+'-'+String(w).padStart(2,'0');}
+const D=RAW.map(a=>{const r={f:a[0],y:+a[0].slice(0,4),m:+a[0].slice(5,7),c:a[1],mo:a[2],e:a[3],ep:a[4],g:a[5],op:a[6],po:a[7],co:a[8],t:a[9],q:a[10]};r.wk=isoSem(r.f);r.h=(r.op+' '+r.po+' '+r.e+' '+r.ep+' '+r.g+' '+r.co+' '+r.c+' '+r.t+' '+r.mo).toLowerCase();return r;});
 const FIN=D.reduce((m,r)=>r.f>m?r.f:m,'');
 const fdate=s=>s.slice(8)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 const lab=(d,k)=>d==='op'?'OP '+k:d==='po'?'PO '+k:d==='f'?fdate(k):k;
@@ -429,7 +429,7 @@ const fmt=n=>Math.round(n).toLocaleString('es-PE');
 const pct=(a,b)=>b?((a/b)*100).toLocaleString('es-PE',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':'—';
 const sum=a=>a.reduce((s,r)=>s+r.q,0);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S={y:'all',c:'',mo:'',mes:'',d1:'',d2:'',g:'',ep:'',e:'',op:'',po:'',q:'',tab:0,d:'g'};
+const S={y:'all',c:'',mo:'',mes:'',sem:'',g:'',ep:'',e:'',op:'',po:'',q:'',tab:0,d:'g'};
 let CH=[],MC=[];
 Chart.defaults.font.family="Calibri, Arial, sans-serif";Chart.defaults.font.size=12;Chart.defaults.color="#5F726C";Chart.defaults.borderColor="#F1F6F4";
 Chart.defaults.maintainAspectRatio=false;Chart.defaults.plugins.tooltip.backgroundColor='rgba(14,59,54,.95)';Chart.defaults.plugins.tooltip.padding=10;Chart.defaults.plugins.tooltip.cornerRadius=6;
@@ -438,9 +438,9 @@ const LEY={position:'top',align:'end',labels:{boxWidth:12,usePointStyle:true,pad
 
 /* ---------- filtros ---------- */
 const has=(v,x)=>!v.trim()||x.toLowerCase().includes(v.trim().toLowerCase());
-function base(){const q=S.q.trim().toLowerCase();return D.filter(r=>(!S.c||r.c===S.c)&&(!S.mo||r.mo===S.mo)&&(!S.mes||r.f.slice(0,7)===S.mes)&&(!S.d1||r.f>=S.d1)&&(!S.d2||r.f<=S.d2)&&has(S.g,r.g)&&has(S.ep,r.ep)&&has(S.e,r.e)&&has(S.op,r.op)&&has(S.po,r.po)&&(!q||r.h.includes(q)));}
+function base(){const q=S.q.trim().toLowerCase();return D.filter(r=>(!S.c||r.c===S.c)&&(!S.mo||r.mo===S.mo)&&(!S.mes||r.f.slice(0,7)===S.mes)&&(!S.sem||r.wk===S.sem)&&has(S.g,r.g)&&has(S.ep,r.ep)&&has(S.e,r.e)&&has(S.op,r.op)&&has(S.po,r.po)&&(!q||r.h.includes(q)));}
 function sel(){const b=base();return (S.y==='2025'||S.y==='2026')?b.filter(r=>r.y===+S.y):b;}
-const filtrado=()=>S.y!=='all'||S.c||S.mo||S.mes||S.d1||S.d2||S.g.trim()||S.ep.trim()||S.e.trim()||S.op.trim()||S.po.trim()||S.q.trim();
+const filtrado=()=>S.y!=='all'||S.c||S.mo||S.mes||S.sem||S.g.trim()||S.ep.trim()||S.e.trim()||S.op.trim()||S.po.trim()||S.q.trim();
 function stats(a,key){const m=new Map();a.forEach(r=>{const k=r[key];let o=m.get(k);if(!o){o={k,q:0,n:0,ops:new Set(),fs:new Set(),cs:new Set(),p:r.f,u:r.f,nz:0,nzm:''};m.set(k,o);}
  o.q+=r.q;o.n++;o.ops.add(r.op);o.fs.add(r.f);o.cs.add(r.c);if(r.f<o.p)o.p=r.f;if(r.f>o.u)o.u=r.f;if(r.mo!=='Saldos'){o.nz+=r.q;o.nzm=r.mo;}});
  return [...m.values()].map(o=>{o.v=o.fs.size;o.d=Math.round((new Date(o.u)-new Date(o.p))/864e5);return o;}).sort((a,b)=>b.q-a.q);}
@@ -577,7 +577,7 @@ function plegar(){const mv=matchMedia('(max-width:600px)').matches;document.quer
 const COLS_XLS=[{campo:'f',titulo:'Fecha',tipo:'fecha'},{campo:'c',titulo:'Cliente',tipo:'texto'},{campo:'g',titulo:'Grupo',tipo:'texto'},{campo:'op',titulo:'OP',tipo:'alfanumerico'},{campo:'po',titulo:'PO',tipo:'alfanumerico'},{campo:'ep',titulo:'Estilo propio',tipo:'alfanumerico'},{campo:'e',titulo:'Estilo cliente',tipo:'texto'},{campo:'co',titulo:'Color',tipo:'texto'},{campo:'t',titulo:'Talla',tipo:'alfanumerico'},{campo:'mo',titulo:'Motivo',tipo:'texto'},{campo:'q',titulo:'Prendas',tipo:'entero'}];
 async function bajarXls(a,titulo,sub,archivo){if(!a.length)return;
  await exportarExcelLIVES({archivo,titulo,sub,origen:'Saldos.xlsx',hoja:'Detalle',congelarCols:0,columnas:COLS_XLS,filas:a.map(r=>({f:new Date(r.f+'T00:00:00'),c:r.c,g:r.g,op:r.op,po:r.po,ep:r.ep,e:r.e,co:r.co,t:r.t,mo:r.mo,q:r.q}))});}
-function subFiltros(){const p=['Año: '+(S.y==='all'?'2025 y 2026':S.y),'Cliente: '+(S.c||'todos'),'Motivo: '+(S.mo||'todos')];if(S.mes)p.push('Mes: '+MES[+S.mes.slice(5)-1]+' '+S.mes.slice(0,4));if(S.d1||S.d2)p.push('Fechas: '+(S.d1?fdate(S.d1):'inicio')+' a '+(S.d2?fdate(S.d2):'fin'));[['g','Grupo'],['ep','Estilo propio'],['e','Estilo cliente'],['op','OP'],['po','PO']].forEach(([k,t])=>{if(S[k].trim())p.push(t+': '+S[k].trim());});if(S.q.trim())p.push('Búsqueda: '+S.q.trim());return p.join(' · ');}
+function subFiltros(){const p=['Año: '+(S.y==='all'?'2025 y 2026':S.y),'Cliente: '+(S.c||'todos'),'Motivo: '+(S.mo||'todos')];if(S.mes)p.push('Mes: '+MES[+S.mes.slice(5)-1]+' '+S.mes.slice(0,4));if(S.sem)p.push('Semana: '+S.sem.slice(5)+' de '+S.sem.slice(0,4));[['g','Grupo'],['ep','Estilo propio'],['e','Estilo cliente'],['op','OP'],['po','PO']].forEach(([k,t])=>{if(S[k].trim())p.push(t+': '+S[k].trim());});if(S.q.trim())p.push('Búsqueda: '+S.q.trim());return p.join(' · ');}
 
 /* ---------- ventana de detalle ---------- */
 const M={stack:[],tab:0,all:false};
@@ -645,15 +645,15 @@ function barra(){
  [['fG','g','dlG'],['fEp','ep','dlEp'],['fE','e','dlE'],['fOp','op','dlOp'],['fPo','po','dlPo']].forEach(([id,key,dl])=>{document.getElementById(dl).innerHTML=opt(por(key));});
  const ms=[...new Set(D.map(r=>r.f.slice(0,7)))].sort().reverse();
  document.getElementById('fMes').innerHTML='<option value="">Todos los meses</option>'+ms.map(k=>`<option value="${k}">${MES[+k.slice(5)-1]} ${k.slice(0,4)}</option>`).join('');
- ['fD1','fD2'].forEach(id=>{const e=document.getElementById(id);e.min=D.reduce((m,r)=>r.f<m?r.f:m,FIN);e.max=FIN;});
+ const wks=new Map();D.forEach(r=>{if(wks.has(r.wk))return;const t=new Date(r.f+'T00:00:00Z'),lu=new Date(t-((t.getUTCDay()+6)%7)*864e5),dm=new Date(+lu+6*864e5),f2=x=>x.toISOString().slice(8,10)+'/'+x.toISOString().slice(5,7);wks.set(r.wk,{ini:f2(lu),fin:f2(dm)});});
+ document.getElementById('fSem').innerHTML='<option value="">Todas las semanas</option>'+[...wks.keys()].sort().reverse().map(k=>`<option value="${k}">Sem ${+k.slice(5)} · ${k.slice(0,4)} (${wks.get(k).ini} al ${wks.get(k).fin})</option>`).join('');
  document.getElementById('fMes').onchange=e=>{S.mes=e.target.value;render();};
- document.getElementById('fD1').onchange=e=>{S.d1=e.target.value;render();};
- document.getElementById('fD2').onchange=e=>{S.d2=e.target.value;render();};
+ document.getElementById('fSem').onchange=e=>{S.sem=e.target.value;render();};
  document.getElementById('fC').onchange=e=>{S.c=e.target.value;render();};
  document.getElementById('fM').onchange=e=>{S.mo=e.target.value;render();};
  const dbn=(id,key)=>{let tm;document.getElementById(id).oninput=e=>{clearTimeout(tm);tm=setTimeout(()=>{S[key]=e.target.value;render();},250);};};
  dbn('fG','g');dbn('fEp','ep');dbn('fE','e');dbn('fOp','op');dbn('fPo','po');dbn('fQ','q');
- document.getElementById('bLim').onclick=()=>{Object.assign(S,{y:'all',c:'',mo:'',mes:'',d1:'',d2:'',g:'',ep:'',e:'',op:'',po:'',q:''});['fG','fEp','fE','fOp','fPo','fQ'].forEach(id=>document.getElementById(id).value='');document.getElementById('fC').value='';document.getElementById('fM').value='';document.getElementById('fMes').value='';document.getElementById('fD1').value='';document.getElementById('fD2').value='';barra();render();};
+ document.getElementById('bLim').onclick=()=>{Object.assign(S,{y:'all',c:'',mo:'',mes:'',sem:'',g:'',ep:'',e:'',op:'',po:'',q:''});['fG','fEp','fE','fOp','fPo','fQ'].forEach(id=>document.getElementById(id).value='');document.getElementById('fC').value='';document.getElementById('fM').value='';document.getElementById('fMes').value='';document.getElementById('fSem').value='';barra();render();};
  document.getElementById('bXls').onclick=()=>bajarXls(detRows(),'Saldos — Detalle',subFiltros(),'Saldos_Detalle.xlsx');
  document.addEventListener('click',e=>{if(e.target.closest('.verm'))return;const t=e.target.closest('[data-d]');if(t&&t.dataset.k!=null&&!e.target.closest('#segD')){abrir(t.dataset.d,t.dataset.k);}});
  document.getElementById('mdl').addEventListener('click',e=>{if(e.target.id==='mdl')cerrarM();});
