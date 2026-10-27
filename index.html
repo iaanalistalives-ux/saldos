@@ -633,20 +633,25 @@ function renderM(){
 /* ---------- barra ---------- */
 function barra(){
  const sg=document.getElementById('segY');sg.innerHTML=[['all','Todo'],['2025','2025'],['2026','2026']].map(([k,t])=>`<button type="button" data-k="${k}" class="${S.y===k?'active':''}">${t}</button>`).join('');
- sg.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.y=b.dataset.k;barra();render();});
+ sg.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.y=b.dataset.k;opciones();barra();render();});
  const sd=document.getElementById('segD');sd.innerHTML=DORD.map(k=>`<button type="button" data-k="${k}" class="${S.d===k?'active':''}">${DL[k]}</button>`).join('');
  sd.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.d=b.dataset.k;barra();render();});
 }
-(function(){
- const por=key=>{const m=new Map();D.forEach(r=>m.set(r[key],(m.get(r[key])||0)+r.q));return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);};
+function opciones(){
+ const Dy=S.y==='all'?D:D.filter(r=>r.y===+S.y);
+ const por=key=>{const m=new Map();Dy.forEach(r=>m.set(r[key],(m.get(r[key])||0)+r.q));return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);};
  const opt=a=>a.map(c=>`<option value="${esc(c)}">`).join('');
  document.getElementById('fC').innerHTML='<option value="">Todos los clientes</option>'+por('c').map(c=>`<option>${esc(c)}</option>`).join('');
  document.getElementById('fM').innerHTML='<option value="">Todos los motivos</option>'+por('mo').map(c=>`<option>${esc(c)}</option>`).join('');
  [['fG','g','dlG'],['fEp','ep','dlEp'],['fE','e','dlE'],['fOp','op','dlOp'],['fPo','po','dlPo']].forEach(([id,key,dl])=>{document.getElementById(dl).innerHTML=opt(por(key));});
- const ms=[...new Set(D.map(r=>r.f.slice(0,7)))].sort().reverse();
+ const ms=[...new Set(Dy.map(r=>r.f.slice(0,7)))].sort().reverse();
  document.getElementById('fMes').innerHTML='<option value="">Todos los meses</option>'+ms.map(k=>`<option value="${k}">${MES[+k.slice(5)-1]} ${k.slice(0,4)}</option>`).join('');
- const wks=new Map();D.forEach(r=>{if(wks.has(r.wk))return;const t=new Date(r.f+'T00:00:00Z'),lu=new Date(t-((t.getUTCDay()+6)%7)*864e5),dm=new Date(+lu+6*864e5),f2=x=>x.toISOString().slice(8,10)+'/'+x.toISOString().slice(5,7);wks.set(r.wk,{ini:f2(lu),fin:f2(dm)});});
+ const wks=new Map();Dy.forEach(r=>{if(wks.has(r.wk))return;const t=new Date(r.f+'T00:00:00Z'),lu=new Date(t-((t.getUTCDay()+6)%7)*864e5),dm=new Date(+lu+6*864e5),f2=x=>x.toISOString().slice(8,10)+'/'+x.toISOString().slice(5,7);wks.set(r.wk,{ini:f2(lu),fin:f2(dm)});});
  document.getElementById('fSem').innerHTML='<option value="">Todas las semanas</option>'+[...wks.keys()].sort().reverse().map(k=>`<option value="${k}">Sem ${+k.slice(5)} · ${k.slice(0,4)} (${wks.get(k).ini} al ${wks.get(k).fin})</option>`).join('');
+ [['c','fC'],['mo','fM'],['mes','fMes'],['sem','fSem']].forEach(([k,id])=>{const el=document.getElementById(id);if(S[k]&&![...el.options].some(o=>o.value===S[k]||o.text===S[k])){S[k]='';}el.value=S[k];});
+}
+(function(){
+ opciones();
  document.getElementById('fMes').onchange=e=>{S.mes=e.target.value;render();};
  document.getElementById('fSem').onchange=e=>{S.sem=e.target.value;render();};
  document.getElementById('fC').onchange=e=>{S.c=e.target.value;render();};
